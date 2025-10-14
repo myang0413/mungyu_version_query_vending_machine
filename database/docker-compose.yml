@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: ankane/pgvector
+    container_name: dvd_rental_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=dvdrental
+
+volumes:
+  postgres_data:
