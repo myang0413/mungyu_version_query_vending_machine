@@ -4,6 +4,7 @@ import pandas as pd
 import altair as alt
 import json
 from datetime import datetime
+import base64
 
 # 페이지 설정
 st.set_page_config(
@@ -36,12 +37,18 @@ LANGUAGES = {
         "error_general": "오류가 발생했습니다",
         "warning_empty": "질문을 입력해주세요.",
         "download_excel": "📥 엑셀로 다운로드",
+        "download_chart": "💾 차트 저장",
         "example_questions": "💡 예시 질문",
         "examples": [
-            "카테고리별 영화 수를 막대 그래프로 보여줘",
+            "카테고리별 영화 수를 시각화 해줘",
             "가장 많이 대여한 고객 10명을 보여줘",
-            "월별 대여 건수 추이를 선 그래프로",
-            "배우별 출연 영화 수를 보여줘"
+            "배우별 출연 영화 수를 보여줘",
+            "가장 많은 영화를 대여한 고객의 이름과 대여 횟수를 알려주세요.",
+            "액션(Action) 장르의 영화 목록을 보여주세요."
+            "배우 PENELOPE GUINESS가 출연한 모든 영화의 제목은 무엇인가요?",
+            "등급이 'R'인 모든 영화의 제목과 설명은 무엇인가요?",
+            "가장 최근에 가입한 고객 5명은 누구인가요?",
+            "가장 많은 수익을 낸 상위 5개의 영화는 무엇인가요?"
         ]
     },
     "English": {
@@ -66,12 +73,18 @@ LANGUAGES = {
         "error_general": "An error occurred",
         "warning_empty": "Please enter a question.",
         "download_excel": "📥 Download as Excel",
+        "download_chart": "💾 Save Chart",
         "example_questions": "💡 Example Questions",
         "examples": [
-            "Show me the number of movies by category as a bar chart",
+            "Visualize the number of movies by category",
             "Top 10 customers by rental count",
-            "Show rental trends by month as a line chart",
-            "Show the number of movies per actor"
+            "Show the number of movies per actor",
+             "Please provide the name and number of rentals for the customer who rented the most movies.",
+            "Show me a list of movies in the Action genre.",
+            "What are the titles of all movies starring PENELOPE GUINESS?",
+            "What are the titles and descriptions of all movies rated ‘R’?",
+            "Who are the 5 most recently registered customers?",
+            "What are the top 5 highest-grossing movies?"
         ]
     }
 }
@@ -84,7 +97,8 @@ if "conversation_history" not in st.session_state:
 
 # 사이드바 설정
 with st.sidebar:
-    st.header(LANGUAGES[st.session_state.language]["language"])
+    lang = LANGUAGES[st.session_state.language]
+    st.header(lang["language"])
     selected_language = st.selectbox(
         "",
         options=["한국어", "English"],
@@ -93,10 +107,11 @@ with st.sidebar:
     )
     st.session_state.language = selected_language
     
+    # 언어 변경 시 lang 재설정
     lang = LANGUAGES[st.session_state.language]
     
     st.markdown("---")
-    st.subheader(lang["example_questions"])
+    st.markdown(f"**{lang['example_questions']}**")
     for example in lang["examples"]:
         st.markdown(f"- {example}")
     
@@ -128,7 +143,7 @@ if st.button(lang["run_button"], type="primary", use_container_width=True):
     if question:
         with st.spinner("⏳ Processing..."):
             try:
-                # FastAPI 백엔드에 요청 (언어 정보 포함)
+                # FastAPI 백엔드에 요청
                 response = requests.post(
                     "http://127.0.0.1:8000/query",
                     json={"question": question, "language": st.session_state.language}
@@ -149,7 +164,7 @@ if st.button(lang["run_button"], type="primary", use_container_width=True):
                 
                 # 결과 표시
                 st.success("✅ Query executed successfully!")
-                
+                    
                 col1, col2 = st.columns([2, 1])
                 
                 with col1:
@@ -164,32 +179,113 @@ if st.button(lang["run_button"], type="primary", use_container_width=True):
                         chart_data = pd.DataFrame(data["chart_data"])
                         
                         if not chart_data.empty and len(chart_data.columns) >= 2:
-                            x_col = chart_data.columns[0]
-                            y_col = chart_data.columns[1]
+                            # 데이터 타입을 기반으로 X축과 Y축 자동 결정
+                            numeric_cols = [col for col in chart_data.columns if pd.api.types.is_numeric_dtype(chart_data[col])]
+                            non_numeric_cols = [col for col in chart_data.columns if not pd.api.types.is_numeric_dtype(chart_data[col])]
+                            
+                            # Y축은 숫자형 컬럼, X축은 비숫자형 컬럼 (카테고리)
+                            if len(numeric_cols) > 0 and len(non_numeric_cols) > 0:
+                                y_col = numeric_cols[0]
+                                x_col = non_numeric_cols[0]
+                            elif len(numeric_cols) >= 2:
+                                # 모두 숫자형이면 첫 번째를 X, 두 번째를 Y로
+                                x_col = numeric_cols[0]
+                                y_col = numeric_cols[1]
+                            else:
+                                # 기본값: 첫 번째 컬럼을 X, 두 번째를 Y로
+                                x_col = chart_data.columns[0]
+                                y_col = chart_data.columns[1]
+                            
                             x_type = 'quantitative' if pd.api.types.is_numeric_dtype(chart_data[x_col]) else 'nominal'
                             y_type = 'quantitative' if pd.api.types.is_numeric_dtype(chart_data[y_col]) else 'nominal'
                             
+                            chart = None
                             if chart_type == 'bar':
                                 chart = alt.Chart(chart_data).mark_bar().encode(
-                                    x=alt.X(x_col, type=x_type, title=x_col.capitalize()),
-                                    y=alt.Y(y_col, type=y_type, title=y_col.capitalize()),
+                                    x=alt.X(x_col, type=x_type, title=x_col),
+                                    y=alt.Y(y_col, type=y_type, title=y_col),
                                     tooltip=list(chart_data.columns)
                                 ).properties(height=300).interactive()
-                                st.altair_chart(chart, use_container_width=True)
                             elif chart_type == 'line':
                                 chart = alt.Chart(chart_data).mark_line(point=True).encode(
-                                    x=alt.X(x_col, type=x_type, title=x_col.capitalize()),
-                                    y=alt.Y(y_col, type=y_type, title=y_col.capitalize()),
+                                    x=alt.X(x_col, type=x_type, title=x_col),
+                                    y=alt.Y(y_col, type=y_type, title=y_col),
                                     tooltip=list(chart_data.columns)
                                 ).properties(height=300).interactive()
-                                st.altair_chart(chart, use_container_width=True)
                             elif chart_type == 'pie':
                                 chart = alt.Chart(chart_data).mark_arc().encode(
                                     theta=alt.Theta(field=y_col, type='quantitative'),
                                     color=alt.Color(field=x_col, type='nominal'),
                                     tooltip=list(chart_data.columns)
                                 ).properties(height=300)
+                            
+                            if chart:
                                 st.altair_chart(chart, use_container_width=True)
+                                
+                                # 차트 저장 버튼 (3개 열)
+                                col_chart1, col_chart2, col_chart3 = st.columns(3)
+                                
+                                with col_chart1:
+                                    # PNG 형식으로 차트 이미지 다운로드
+                                    try:
+                                        import vl_convert as vlc
+                                        png_data = vlc.vegalite_to_png(chart.to_dict(), scale=2)
+                                        st.download_button(
+                                            label=f"🖼️ {lang['download_chart']} (PNG)",
+                                            data=png_data,
+                                            file_name=f"chart_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                                            mime="image/png",
+                                            use_container_width=True,
+                                            help="PNG 이미지 파일"
+                                        )
+                                    except ImportError:
+                                        # vl-convert가 없으면 SVG로 대체
+                                        svg_data = chart.to_json()
+                                        st.download_button(
+                                            label=f"🖼️ {lang['download_chart']} (SVG)",
+                                            data=svg_data,
+                                            file_name=f"chart_{datetime.now().strftime('%Y%m%d_%H%M%S')}.svg",
+                                            mime="image/svg+xml",
+                                            use_container_width=True,
+                                            help="SVG 벡터 이미지"
+                                        )
+                                
+                                with col_chart2:
+                                    # SVG 형식으로 차트 이미지 다운로드
+                                    try:
+                                        import vl_convert as vlc
+                                        svg_data = vlc.vegalite_to_svg(chart.to_dict())
+                                        st.download_button(
+                                            label=f"🎨 {lang['download_chart']} (SVG)",
+                                            data=svg_data,
+                                            file_name=f"chart_{datetime.now().strftime('%Y%m%d_%H%M%S')}.svg",
+                                            mime="image/svg+xml",
+                                            use_container_width=True,
+                                            help="SVG 벡터 이미지 (확대해도 선명)"
+                                        )
+                                    except ImportError:
+                                        # JSON 폴백
+                                        chart_json = chart_data.to_json(orient='records', force_ascii=False)
+                                        st.download_button(
+                                            label=f"📊 {lang['download_chart']} (JSON)",
+                                            data=chart_json,
+                                            file_name=f"chart_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                                            mime="application/json",
+                                            use_container_width=True,
+                                            help="구조화된 데이터 형식"
+                                        )
+                                
+                                with col_chart3:
+                                    # CSV 형식으로 차트 데이터 다운로드
+                                    chart_csv = chart_data.to_csv(index=False).encode('utf-8-sig')
+                                    st.download_button(
+                                        label=f"📥 {lang['download_chart']} (CSV)",
+                                        data=chart_csv,
+                                        file_name=f"chart_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                        mime="text/csv",
+                                        use_container_width=True,
+                                        help="엑셀에서 열 수 있는 형식"
+                                    )
                             else:
                                 st.info(lang["unsupported_chart"])
                         else:

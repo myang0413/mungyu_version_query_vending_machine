@@ -81,6 +81,18 @@ wcwidth==0.2.14
 langchain
 langchain-community
 langchain-openai
+langchain-postgres
 uvicorn
 python-multipart
 fastapi
+
+# Vector Database
+pgvector
+
+# Chart Image Export
+vl-convert-python
+
+# 임베딩 생성에 필요한 추가 라이브러리는 이미 포함됨
+# - tqdm: 진행률 표시 (이미 포함)
+# - psycopg2-binary: PostgreSQL 연결 (이미 포함)
+# - langchain-openai: OpenAI 임베딩 (이미 포함)

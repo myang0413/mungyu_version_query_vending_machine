@@ -5,11 +5,14 @@ This is a demo project that converts natural language questions into SQL queries
 ## ✨ Features
 
 - **Natural Language to SQL**: Understands user questions and converts them into SQL queries.
-- **Intent Recognition**: Automatically detects if the user wants data visualization and recommends the appropriate chart type.
+- **Vector Embedding Search**: Uses OpenAI embeddings and pgvector for semantic search across database content.
+- **Hybrid Search**: Combines vector search with Text-to-SQL for more accurate query generation.
+- **Smart Intent Recognition**: Detects visualization requests only when explicitly mentioned (e.g., "visualize", "chart", "graph").
 - **Data Visualization**: Generates interactive charts (bar, line, pie) based on query results.
+- **Chart Export**: Save charts as JSON or CSV files for further analysis.
 - **Natural Language Response**: Generates a natural language answer based on the SQL query results.
 - **Multilingual Support**: Supports both Korean and English for questions and responses.
-- **Database Integration**: Connects to a PostgreSQL database to query real data.
+- **Database Integration**: Connects to a PostgreSQL database with pgvector extension.
 - **LangChain Integration**: Utilizes LangChain to build an efficient Text-to-SQL pipeline.
 - **Separated Backend/Frontend**: A FastAPI backend handles the logic, while a Streamlit app provides the UI.
 
@@ -20,33 +23,41 @@ sequenceDiagram
     participant User
     participant Streamlit UI
     participant FastAPI Backend
+    participant Vector Search
     participant LangChain Chain
     participant OpenAI
     participant PostgreSQL DB
 
     User->>Streamlit UI: 1. Enter question (Korean/English)
     Streamlit UI->>FastAPI Backend: 2. Send question + language via API
-    FastAPI Backend->>LangChain Chain: 3. Invoke chain with question
+    
+    Note over FastAPI Backend,Vector Search: Hybrid Search
+    FastAPI Backend->>Vector Search: 3. Perform semantic search
+    Vector Search->>PostgreSQL DB: 4. Query vector embeddings (pgvector)
+    PostgreSQL DB-->>Vector Search: 5. Return similar content
+    Vector Search-->>FastAPI Backend: 6. Return relevant context
+    
+    FastAPI Backend->>LangChain Chain: 7. Invoke chain with question + context
     
     Note over LangChain Chain,OpenAI: Intent Recognition
-    LangChain Chain->>OpenAI: 4. Analyze intent (visualization needed?)
-    OpenAI-->>LangChain Chain: 5. Return intent + chart type
+    LangChain Chain->>OpenAI: 8. Analyze intent (explicit visualization?)
+    OpenAI-->>LangChain Chain: 9. Return intent + chart type
     
     Note over LangChain Chain,OpenAI: SQL Generation
-    LangChain Chain->>OpenAI: 6. Generate SQL Query
-    OpenAI-->>LangChain Chain: 7. Return SQL Query
+    LangChain Chain->>OpenAI: 10. Generate SQL Query (with context)
+    OpenAI-->>LangChain Chain: 11. Return SQL Query
     
     Note over LangChain Chain,PostgreSQL DB: Query Execution
-    LangChain Chain->>PostgreSQL DB: 8. Execute SQL Query
-    PostgreSQL DB-->>LangChain Chain: 9. Return SQL Result
+    LangChain Chain->>PostgreSQL DB: 12. Execute SQL Query
+    PostgreSQL DB-->>LangChain Chain: 13. Return SQL Result
     
     Note over LangChain Chain,OpenAI: Response Generation
-    LangChain Chain->>OpenAI: 10. Generate NL answer + chart data
-    OpenAI-->>LangChain Chain: 11. Return answer + chart data
+    LangChain Chain->>OpenAI: 14. Generate NL answer + chart data
+    OpenAI-->>LangChain Chain: 15. Return answer + chart data
     
-    LangChain Chain-->>FastAPI Backend: 12. Return all results
-    FastAPI Backend-->>Streamlit UI: 13. Send response (SQL, Result, Answer, Chart)
-    Streamlit UI->>User: 14. Display results + visualization
+    LangChain Chain-->>FastAPI Backend: 16. Return all results
+    FastAPI Backend-->>Streamlit UI: 17. Send response (SQL, Result, Answer, Chart)
+    Streamlit UI->>User: 18. Display results + visualization + export options
 ```
 
 ## 🛠️ Tech Stack
@@ -55,10 +66,11 @@ sequenceDiagram
 - **Backend**: FastAPI
 - **Frontend**: Streamlit
 - **Core Logic**: LangChain
-- **Database**: PostgreSQL (DVD Rental Sample Database)
+- **Database**: PostgreSQL with pgvector extension (DVD Rental Sample Database)
+- **Vector Search**: OpenAI Embeddings (text-embedding-3-small) + pgvector
 - **LLM**: OpenAI GPT-4-Turbo
 - **Visualization**: Altair
-- **Key Libraries**: `fastapi`, `uvicorn`, `streamlit`, `langchain`, `langchain-openai`, `psycopg2-binary`, `altair`, `pandas`
+- **Key Libraries**: `fastapi`, `uvicorn`, `streamlit`, `langchain`, `langchain-openai`, `psycopg2-binary`, `altair`, `pandas`, `pgvector`
 
 ## 🚀 Getting Started
 
@@ -110,7 +122,22 @@ DB_NAME=your_db_name
 OPENAI_API_KEY=your_openai_api_key
 ```
 
-### 5. Run the Application
+### 5. Generate Vector Embeddings (First Time Only)
+
+Before running the application for the first time, generate vector embeddings for the database content:
+
+```bash
+# Make sure your virtual environment is activated
+python -m app.embeddings
+```
+
+This will:
+- Generate embeddings for films, actors, customers, and categories
+- Store them in the PostgreSQL database with pgvector
+- Create a unified embeddings table for hybrid search
+- Takes approximately 1-2 minutes and costs ~$0.01-0.05 in OpenAI API usage
+
+### 6. Run the Application
 
 You need to run two processes in separate terminals from the `mungyu_version_query_vending_machine` directory.
 
@@ -139,11 +166,14 @@ Now, open your web browser and go to the local URL provided by Streamlit (e.g., 
 ## ✨ 주요 기능
 
 - **Text-to-SQL**: 사용자의 질문을 이해하고 SQL 쿼리로 변환합니다.
-- **의도 파악**: 사용자가 데이터 시각화를 원하는지 자동으로 감지하고 적절한 차트 타입을 추천합니다.
+- **벡터 임베딩 검색**: OpenAI 임베딩과 pgvector를 사용하여 데이터베이스 컨텐츠에 대한 의미 기반 검색을 수행합니다.
+- **하이브리드 검색**: 벡터 검색과 Text-to-SQL을 결합하여 더 정확한 쿼리를 생성합니다.
+- **스마트 의도 파악**: "시각화", "차트", "그래프" 등 명시적인 요청이 있을 때만 시각화를 수행합니다.
 - **데이터 시각화**: 쿼리 결과를 기반으로 인터렉티브 차트(막대, 선, 원)를 생성합니다.
+- **차트 내보내기**: 차트를 JSON 또는 CSV 파일로 저장하여 추가 분석이 가능합니다.
 - **자연어 답변 생성**: SQL 쿼리 결과를 바탕으로 자연스러운 문장 답변을 생성합니다.
 - **다국어 지원**: 한국어와 영어로 질문하고 답변을 받을 수 있습니다.
-- **데이터베이스 연동**: PostgreSQL 데이터베이스에 연결하여 실제 데이터를 조회합니다.
+- **데이터베이스 연동**: pgvector 확장이 설치된 PostgreSQL 데이터베이스에 연결합니다.
 - **LangChain 통합**: LangChain을 활용하여 효율적인 Text-to-SQL 파이프라인을 구축합니다.
 - **백엔드/프론트엔드 분리**: FastAPI 백엔드가 로직을 처리하고, Streamlit 앱이 UI를 제공합니다.
 
@@ -153,10 +183,11 @@ Now, open your web browser and go to the local URL provided by Streamlit (e.g., 
 - **백엔드**: FastAPI
 - **프론트엔드**: Streamlit
 - **핵심 로직**: LangChain
-- **데이터베이스**: PostgreSQL (DVD Rental 샘플 데이터베이스)
+- **데이터베이스**: PostgreSQL with pgvector 확장 (DVD Rental 샘플 데이터베이스)
+- **벡터 검색**: OpenAI Embeddings (text-embedding-3-small) + pgvector
 - **LLM**: OpenAI GPT-4-Turbo
 - **시각화**: Altair
-- **핵심 라이브러리**: `fastapi`, `uvicorn`, `streamlit`, `langchain`, `langchain-openai`, `psycopg2-binary`, `altair`, `pandas`
+- **핵심 라이브러리**: `fastapi`, `uvicorn`, `streamlit`, `langchain`, `langchain-openai`, `psycopg2-binary`, `altair`, `pandas`, `pgvector`
 
 ## 🚀 시작하기
 
@@ -208,7 +239,22 @@ DB_NAME=your_db_name
 OPENAI_API_KEY=your_openai_api_key
 ```
 
-### 5. 애플리케이션 실행
+### 5. 벡터 임베딩 생성 (최초 1회만)
+
+애플리케이션을 처음 실행하기 전에 데이터베이스 컨텐츠에 대한 벡터 임베딩을 생성합니다:
+
+```bash
+# 가상 환경이 활성화되었는지 확인하세요.
+python -m app.embeddings
+```
+
+이 명령은:
+- 영화, 배우, 고객, 카테고리에 대한 임베딩을 생성합니다
+- pgvector를 사용하여 PostgreSQL 데이터베이스에 저장합니다
+- 하이브리드 검색을 위한 통합 임베딩 테이블을 생성합니다
+- 약 1-2분 소요되며 OpenAI API 사용료는 약 $0.01-0.05입니다
+
+### 6. 애플리케이션 실행
 
 `mungyu_version_query_vending_machine` 디렉터리에서 두 개의 터미널을 열고 각각 다음 명령을 실행해야 합니다.
 
