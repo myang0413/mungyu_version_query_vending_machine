@@ -3,6 +3,7 @@ from typing import List, Any, Dict, Optional
 
 class QueryRequest(BaseModel):
     question: str
+    language: Optional[str] = "한국어"
 
 class QueryResponse(BaseModel):
     sql_query: str

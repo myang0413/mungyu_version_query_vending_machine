@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from .schemas import QueryRequest, QueryResponse
-from .chains import get_full_chain, get_db
+from .chains import get_full_chain, get_db, clean_json_response
 import json
 
 # FastAPI 앱 인스턴스 생성
@@ -18,13 +18,14 @@ async def handle_query(request: QueryRequest):
     사용자의 자연어 질문을 받아 SQL을 생성하고, 실행한 뒤, 자연어 답변과 차트 데이터를 반환합니다.
     """
     question = request.question
+    language = request.language
     
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
     try:
-        # 전체 체인 실행
-        chain_result = full_chain.invoke({"question": question})
+        # 전체 체인 실행 (언어 파라미터 포함)
+        chain_result = full_chain.invoke({"question": question, "language": language})
         
         # 디버깅을 위한 출력
         print("Chain result:", chain_result)
@@ -32,6 +33,9 @@ async def handle_query(request: QueryRequest):
         # 체인 결과 파싱
         intent_str = chain_result.get("intent", '{}')
         print(f"Intent string: {intent_str}")
+        
+        # JSON 정리
+        intent_str = clean_json_response(intent_str)
         
         try:
             intent_data = json.loads(intent_str) if intent_str.strip() else {}
@@ -47,14 +51,23 @@ async def handle_query(request: QueryRequest):
         final_response_str = chain_result.get("final_response", '{}')
         print(f"Final response string: {final_response_str}")
         
+        # JSON 정리
+        final_response_str = clean_json_response(final_response_str)
+        
         try:
             final_response_data = json.loads(final_response_str) if final_response_str.strip() else {}
         except json.JSONDecodeError as e:
             print(f"Failed to parse final_response JSON: {e}")
+            print(f"Raw final_response_str after cleaning: {final_response_str}")
             final_response_data = {}
         
         natural_language_response = final_response_data.get("natural_language_response", "")
         chart_data = final_response_data.get("chart_data", [])
+        
+        # 디버깅: 파싱된 데이터 출력
+        print(f"Parsed natural_language_response: {natural_language_response}")
+        print(f"Parsed chart_data: {chart_data}")
+        print(f"Chart type: {chart_type}")
 
         # SQL 결과 파싱
         try:

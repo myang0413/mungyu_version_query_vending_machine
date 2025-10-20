@@ -5,7 +5,10 @@ This is a demo project that converts natural language questions into SQL queries
 ## ✨ Features
 
 - **Natural Language to SQL**: Understands user questions and converts them into SQL queries.
+- **Intent Recognition**: Automatically detects if the user wants data visualization and recommends the appropriate chart type.
+- **Data Visualization**: Generates interactive charts (bar, line, pie) based on query results.
 - **Natural Language Response**: Generates a natural language answer based on the SQL query results.
+- **Multilingual Support**: Supports both Korean and English for questions and responses.
 - **Database Integration**: Connects to a PostgreSQL database to query real data.
 - **LangChain Integration**: Utilizes LangChain to build an efficient Text-to-SQL pipeline.
 - **Separated Backend/Frontend**: A FastAPI backend handles the logic, while a Streamlit app provides the UI.
@@ -21,18 +24,29 @@ sequenceDiagram
     participant OpenAI
     participant PostgreSQL DB
 
-    User->>Streamlit UI: 1. Enter question
-    Streamlit UI->>FastAPI Backend: 2. Send question via API request
+    User->>Streamlit UI: 1. Enter question (Korean/English)
+    Streamlit UI->>FastAPI Backend: 2. Send question + language via API
     FastAPI Backend->>LangChain Chain: 3. Invoke chain with question
-    LangChain Chain->>OpenAI: 4. Generate SQL Query
-    OpenAI-->>LangChain Chain: 5. Return SQL Query
-    LangChain Chain->>PostgreSQL DB: 6. Execute SQL Query
-    PostgreSQL DB-->>LangChain Chain: 7. Return SQL Result
-    LangChain Chain->>OpenAI: 8. Generate Natural Language Answer
-    OpenAI-->>LangChain Chain: 9. Return Answer
-    LangChain Chain-->>FastAPI Backend: 10. Return all results
-    FastAPI Backend-->>Streamlit UI: 11. Send response (SQL, Result, Answer)
-    Streamlit UI->>User: 12. Display results
+    
+    Note over LangChain Chain,OpenAI: Intent Recognition
+    LangChain Chain->>OpenAI: 4. Analyze intent (visualization needed?)
+    OpenAI-->>LangChain Chain: 5. Return intent + chart type
+    
+    Note over LangChain Chain,OpenAI: SQL Generation
+    LangChain Chain->>OpenAI: 6. Generate SQL Query
+    OpenAI-->>LangChain Chain: 7. Return SQL Query
+    
+    Note over LangChain Chain,PostgreSQL DB: Query Execution
+    LangChain Chain->>PostgreSQL DB: 8. Execute SQL Query
+    PostgreSQL DB-->>LangChain Chain: 9. Return SQL Result
+    
+    Note over LangChain Chain,OpenAI: Response Generation
+    LangChain Chain->>OpenAI: 10. Generate NL answer + chart data
+    OpenAI-->>LangChain Chain: 11. Return answer + chart data
+    
+    LangChain Chain-->>FastAPI Backend: 12. Return all results
+    FastAPI Backend-->>Streamlit UI: 13. Send response (SQL, Result, Answer, Chart)
+    Streamlit UI->>User: 14. Display results + visualization
 ```
 
 ## 🛠️ Tech Stack
@@ -41,9 +55,10 @@ sequenceDiagram
 - **Backend**: FastAPI
 - **Frontend**: Streamlit
 - **Core Logic**: LangChain
-- **Database**: PostgreSQL
-- **LLM**: OpenAI GPT-3.5-Turbo
-- **Key Libraries**: `fastapi`, `uvicorn`, `streamlit`, `langchain`, `langchain-openai`, `psycopg2-binary`
+- **Database**: PostgreSQL (DVD Rental Sample Database)
+- **LLM**: OpenAI GPT-4-Turbo
+- **Visualization**: Altair
+- **Key Libraries**: `fastapi`, `uvicorn`, `streamlit`, `langchain`, `langchain-openai`, `psycopg2-binary`, `altair`, `pandas`
 
 ## 🚀 Getting Started
 
@@ -124,7 +139,10 @@ Now, open your web browser and go to the local URL provided by Streamlit (e.g., 
 ## ✨ 주요 기능
 
 - **Text-to-SQL**: 사용자의 질문을 이해하고 SQL 쿼리로 변환합니다.
+- **의도 파악**: 사용자가 데이터 시각화를 원하는지 자동으로 감지하고 적절한 차트 타입을 추천합니다.
+- **데이터 시각화**: 쿼리 결과를 기반으로 인터렉티브 차트(막대, 선, 원)를 생성합니다.
 - **자연어 답변 생성**: SQL 쿼리 결과를 바탕으로 자연스러운 문장 답변을 생성합니다.
+- **다국어 지원**: 한국어와 영어로 질문하고 답변을 받을 수 있습니다.
 - **데이터베이스 연동**: PostgreSQL 데이터베이스에 연결하여 실제 데이터를 조회합니다.
 - **LangChain 통합**: LangChain을 활용하여 효율적인 Text-to-SQL 파이프라인을 구축합니다.
 - **백엔드/프론트엔드 분리**: FastAPI 백엔드가 로직을 처리하고, Streamlit 앱이 UI를 제공합니다.
@@ -135,9 +153,10 @@ Now, open your web browser and go to the local URL provided by Streamlit (e.g., 
 - **백엔드**: FastAPI
 - **프론트엔드**: Streamlit
 - **핵심 로직**: LangChain
-- **데이터베이스**: PostgreSQL
-- **LLM**: OpenAI GPT-3.5-Turbo
-- **핵심 라이브러리**: `fastapi`, `uvicorn`, `streamlit`, `langchain`, `langchain-openai`, `psycopg2-binary`
+- **데이터베이스**: PostgreSQL (DVD Rental 샘플 데이터베이스)
+- **LLM**: OpenAI GPT-4-Turbo
+- **시각화**: Altair
+- **핵심 라이브러리**: `fastapi`, `uvicorn`, `streamlit`, `langchain`, `langchain-openai`, `psycopg2-binary`, `altair`, `pandas`
 
 ## 🚀 시작하기
 
